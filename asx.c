@@ -25,9 +25,9 @@ FILE* openFile(const char *filename) {
 	FILE *fp = fopen(filename, "r");
 	if (fp == NULL) {
 		perror("Error opening file");
-	eturn NULL;
+	return NULL;
 }
-	return fp
+	return fp;
 }
 //
 //                                         // -------------------------------
@@ -70,6 +70,12 @@ int main() {
 			SYMTAB[symCount].lineNumber = lineNum;
 			symCount++;
 		}
+
+		// if there are 3 elements: line, opcode, operand 
+
+	//	if (tokenCount == 3) {
+	//		strcpy(
+	//	}
 
 		lineNum++;
 	}
