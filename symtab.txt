@@ -1,0 +1,6 @@
+Line	Label
+---------------------
+1	COPY
+2	FIRST
+3	CLOOP
+4	RETADR
