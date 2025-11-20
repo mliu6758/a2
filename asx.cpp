@@ -8,7 +8,7 @@
 #include <map>
 #include <set>
 #include <vector>
-#include <algorithm>  // NEW: for sorting symbols by address
+#include <algorithm>  
 
 #define MAX_LINE_LEN 256
 #define MAX_TOKENS   10
@@ -21,9 +21,9 @@
 
 using namespace std;
 
-// -------------------------------
-// // SYMTAB ENTRY STRUCTURE
-// // -------------------------------
+
+// SYMTAB STRUCTURE
+
 typedef struct {
 	int lineNumber;
     unsigned int addr;   // address in hex
@@ -34,26 +34,24 @@ typedef struct {
 	int lineNumber; 
 	int hasLabel;
 	int  hasOperand;
-	char label[MAX_LINE_LEN]; // ? (working on this)  empty if no label
+	char label[MAX_LINE_LEN]; //  empty if no label
 	char opcode[MAX_OPCODE];
-	char operand[MAX_OPERAND]; // ??  empty if no operand
+	char operand[MAX_OPERAND]; //  empty if no operand
 } ParsedLine;
 
-// Global SYMTAB
+// global SYMTAB
 static Symbol SYMTAB[MAX_SYMBOLS];
 static int symCount = 0;
 // flags 
 int n = 0, i = 0, x = 0, b = 0, p = 0, e = 0; 
 
-// ---- control section tracking (for symtab.st formatting) ----
+// control section tracking (for symtab.st formatting) 
 static std::string gCsectName = "";
 static unsigned gStartAddr = 0;   // Value (start) column for CSect
 static unsigned gEndAddr   = 0;   // used to compute LENGTH = end - start
 
-//
-//         // -------------------------------
-//         // OPEN FILE FUNCTION
-//         // -------------------------------
+// OPEN FILE FUNCTION
+
 FILE* openFile(const char *filename) { // method to open file 
 	FILE *fp = fopen(filename, "r");
 	if (fp == NULL) {
@@ -63,11 +61,10 @@ FILE* openFile(const char *filename) { // method to open file
 	return fp;
 }
 
-// -------------------------------
-// Simple literal support (END-only pool, optional LTORG upgrade later)
-// -------------------------------
+// Simple literal support (END-only pool)
+
 struct Lit { string key; vector<unsigned char> bytes; unsigned addr=0; bool assigned=false; };
-static map<string, Lit> LITTAB; // keyed by literal text, e.g. "=C'EOF'"
+static map<string, Lit> LITTAB; // keyed by literal text
 
 // writes symtab into a file
 // Pass 2 - now use the object column
@@ -115,7 +112,7 @@ string convertDecToHex(int decimal) {
 	return oss.str();
 }
 
-// -------- Helpers for Pass 1 --------
+// Helpers for Pass 1 
 static inline string trim(const string &s) {
     size_t b = s.find_first_not_of(" \t\r\n");
     if (b == string::npos) return "";
@@ -132,7 +129,7 @@ static vector<string> splitWS(const string &line) {
 }
 
 static bool isComment(const string &s) {
-    // SIC/XE: a period in col 1 denotes a comment; also allow empty lines
+    // period in col 1 = a comment + also allow empty lines
     string t = trim(s);
     return t.empty() || t[0]=='.';
 }
@@ -192,14 +189,14 @@ static int instrSizeBytes(const string &opcodeRaw, const string &operandRaw) {
     return fmt4 ? 4 : 3; // default F3/F4
 }
 
-// -------------------------------
+// 
 // PASS 2 helpers
-// -------------------------------
+// 
 struct OpInfo { unsigned opcode; int defFmt; };
 
 static map<string, OpInfo> buildOptab() {
     map<string, OpInfo> m;
-    // Added general opcodes
+    // Add general opcodes
     m["LDA"]  = {0x00, 3}; m["LDX"]  = {0x04, 3}; m["LDL"]  = {0x08, 3};
     m["STA"]  = {0x0C, 3}; m["STX"]  = {0x10, 3}; m["STL"]  = {0x14, 3};
     m["ADD"]  = {0x18, 3}; m["SUB"]  = {0x1C, 3}; m["MUL"]  = {0x20, 3};
@@ -253,7 +250,7 @@ static string encodeData(const string &op, const string &operand) {
     return "";
 }
 
-// --------- Literal helpers ----------
+// Literal helpers 
 static bool parseLiteral(const string& lit, vector<unsigned char>& out) {
     out.clear();
     if (lit.size()<4 || lit[0]!='=' || (toupper(lit[1])!='C' && toupper(lit[1])!='X') || lit[2]!='\'') return false;
@@ -317,7 +314,7 @@ static void parseAddressing(const string &raw, bool &nOut, bool &iOut, bool &xOu
 
 // Encodes format 3/4
 static string encodeInstr(const map<string,OpInfo>& OPTAB, const string &opcodeRaw,
-                          const string &operandRaw, unsigned currLoc, unsigned nextLoc,
+                          const string &operandRaw, unsigned /*currLoc*/, unsigned nextLoc,
                           unsigned baseReg, bool baseValid, bool &ok, string &errMsg) {
     ok = true; errMsg.clear();
 
@@ -456,9 +453,9 @@ static string encodeInstr(const map<string,OpInfo>& OPTAB, const string &opcodeR
 }
 
 
-// -------------------------------
+// 
 // Build SYMTAB + LOCCTR & write files
-// -------------------------------
+// 
 static int assemblePass1Pass2(const string &inputPath) {
 	// reset SYMTAB per file
 	symCount = 0;
@@ -517,6 +514,12 @@ static int assemblePass1Pass2(const string &inputPath) {
 			operand = oss.str();
 		}
 
+if (opcode == "*" && !operand.empty() && operand[0] == '=') {
+    label = "*";
+    opcode = operand;
+    operand.clear();
+}
+
 		// Handle START (initialize LOCCTR)
 		{
 			string up = opcode; for (auto &c: up) c=toupper(c);
@@ -566,11 +569,33 @@ static int assemblePass1Pass2(const string &inputPath) {
         if (!operand.empty() && operand[0]=='=' && !LITTAB.count(operand)) {
             vector<unsigned char> b;
             if (parseLiteral(operand, b)) {
-                LITTAB[operand] = Lit{operand, b, 0u, false};
+                LITTAB[operand] = Lit{operand, std::vector<unsigned char>(b.begin(), b.end()), 0u, false};
             } else {
                 cerr << "Line " << lineNum << ": malformed literal " << operand << "\n";
             }
         }
+
+// opcode literal statement (=C'...' / =X'...') emits bytes here
+            if (!opcode.empty() && opcode[0] == '=') {
+    vector<unsigned char> b;
+    if (!parseLiteral(opcode, b)) {
+        cerr << "Line " << lineNum << ": malformed literal " << opcode << "\n";
+    } else {
+          std::ostringstream obj; obj<<std::uppercase<<std::hex<<std::setfill('0');
+        for (auto c: b) obj<<std::setw(2)<<static_cast<unsigned>(c);
+
+        locArr.push_back(convertDecToHex(LOCCTR));
+        labelArr.push_back(label.empty() ? "*" : label);
+        opArr.push_back(opcode);
+        operandArr.push_back("");
+        objArr.push_back(obj.str());
+        sizeArr.push_back((int)b.size());
+
+        LITTAB[opcode] = Lit{opcode, b, LOCCTR, true};
+        LOCCTR += (unsigned)b.size();
+    }
+    continue; // skip normal opcode/dir size handling for this line
+}
 
 		// Record current LOC in listing before increment
 		locArr.push_back(convertDecToHex(LOCCTR));
@@ -596,7 +621,7 @@ static int assemblePass1Pass2(const string &inputPath) {
                         labelArr.push_back("*");
                         opArr.push_back(lit.key);
                         operandArr.push_back("");
-                        objArr.push_back(obj.str());
+                      //  objArr.push_back(obj.str());
                         sizeArr.push_back((int)lit.bytes.size());
 
                         LOCCTR += (unsigned)lit.bytes.size();
@@ -626,6 +651,8 @@ static int assemblePass1Pass2(const string &inputPath) {
     // set end address for CSect length
     gEndAddr = LOCCTR;
 
+
+
 	// PASS 2: fill object code
     auto OPTAB = buildOptab();
     unsigned baseReg = 0; bool baseValid = false;
@@ -636,7 +663,7 @@ static int assemblePass1Pass2(const string &inputPath) {
 
         if (up=="START" || up=="END") { 
             if (i >= objArr.size()) objArr.push_back(""); 
-            else if (objArr[i].empty()) objArr[i] = ""; 
+            else objArr[i] = ""; 
             continue; 
         }
 
@@ -664,6 +691,20 @@ static int assemblePass1Pass2(const string &inputPath) {
             if (i >= objArr.size()) objArr.push_back(data); else objArr[i] = data;
             continue;
         }
+
+if (!opcode.empty() && opcode[0] == '=') {
+    if (i >= objArr.size()) {
+     auto it = LITTAB.find(opcode);
+        if (it != LITTAB.end()) {
+            std::ostringstream obj; obj<<std::uppercase<<std::hex<<std::setfill('0');
+            for (auto c: it->second.bytes) obj<<std::setw(2)<<static_cast<unsigned>(c);
+            objArr.push_back(obj.str());
+        } else {
+            objArr.push_back("");
+        }
+    }
+    continue;
+}
 
         // Compute current and next LOCs from arrays
         unsigned curr = 0, next = 0;
@@ -729,15 +770,27 @@ static int assemblePass1Pass2(const string &inputPath) {
             for (const auto &kv : LITTAB) {
                 const auto &lit = kv.second;
                 // Name: try to show a simple name like EOF for =C'EOF'; otherwise use the literal without "=X'/=C'"
-                std::string name = lit.key;
+                std::string key = lit.key;
+               { 
+               size_t p = key.find_first_not_of(" \t");
+        if (p != std::string::npos) key.erase(0, p);
+
+        if (!key.empty() && key[0] == '*') {
+size_t eq = key.find('=');
+            if (eq != std::string::npos) {
+                key = key.substr(eq);
+            }
+         } 
+       }
                 std::string operandHex;
-                if (lit.key.size()>=4 && lit.key[0]=='=' && (lit.key[1]=='C' || lit.key[1]=='c') && lit.key[2]=='\'') {
+                std::string name = key;
+                if (key.size()>=4 && key[0]=='=' && (key[1]=='C' || key[1]=='c') && key[2]=='\'') {
                     // name: content, operand: hex of bytes
-                    size_t end = lit.key.find_last_of('\'');
-                    name = (end==string::npos) ? lit.key : lit.key.substr(3, end-3);
-                } else if (lit.key.size()>=4 && lit.key[0]=='=' && (lit.key[1]=='X' || lit.key[1]=='x') && lit.key[2]=='\'') {
-                    size_t end = lit.key.find_last_of('\'');
-                    name = (end==string::npos) ? lit.key : lit.key.substr(3, end-3);
+                    size_t end = key.find_last_of('\'');
+                    name = (end==string::npos) ? key : key.substr(3, end-3);
+                } else if (key.size()>=4 && key[0]=='=' && (key[1]=='X' || key[1]=='x') && key[2]=='\'') {
+                    size_t end = key.find_last_of('\'');
+                    name = (end==string::npos) ? key : key.substr(3, end-3);
                 }
 
                 std::ostringstream hex; hex<<std::uppercase<<std::hex<<std::setfill('0');
@@ -761,10 +814,8 @@ static int assemblePass1Pass2(const string &inputPath) {
 	return EXIT_SUCCESS;
 }
 
-//
-//                                         // -------------------------------
-//                                         // MAIN
-//                                         // -------------------------------
+//  MAIN
+
 int main(int argc, char* argv[]) {
 	// supports multiple inputs
 	if (argc < 2) {

@@ -1,4 +1,4 @@
-SUM       START   0                      SAMPLE PROGRAM
+SUM       START   0         
 FIRST     LDX    #0          
           LDA    #0          
          +LDB    #TABLE2     
