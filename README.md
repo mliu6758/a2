@@ -1,7 +1,7 @@
 # CS530Assignment2
 
 Names: Mandy Liu, Jasmine Rodelas
-Accounts: cssc2119, cssc1454
+Accounts: cssc2119, cssc2130
 
 Class: CS480 - Operating Systems
 Assignment: Programming Assignment #2
